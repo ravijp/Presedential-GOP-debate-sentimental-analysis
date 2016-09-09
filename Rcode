@@ -1,0 +1,57 @@
+rm(list=ls())
+setwd("C/...")
+
+library(ggplot2) # Data visualization
+library(readr) # CSV file I/O, e.g. the read_csv function
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer") 
+
+#load the twitter data
+tweets <- fread("Sentiment.csv") #use data.table package, fasten the process
+#tweets <- read.csv("Sentiment.csv")
+
+#format the tweets (remove extra words or info like hashtags, username, numbers etc.)
+tweets$text <- gsub("#GOPDebate", "", tweets$text) 
+tweets$text = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", tweets$text) 
+tweets$text <- gsub("#GOPdebate", "", tweets$text)  
+tweets$text = gsub("[[:punct:]]", "", tweets$text)
+tweets$text = gsub("[[:digit:]]", "",tweets$text)
+tweets$text = gsub("http\\w+", "", tweets$text)
+tweets$text = gsub("[ \t]{2,}", "", tweets$text)
+tweets$text = gsub("^\\s+|\\s+$", "", tweets$text)
+tweets$text = gsub("amp", "", tweets$text)
+tweets$text = gsub("[^\x20-\x7E]", "", tweets$text)
+
+
+#create data frame containing text, sentiment and retweet count
+tweet_data <- subset(tweets,selec=c("text","sentiment","retweet_count")) 
+
+sents = levels(factor(tweet_data$sentiment))  
+
+labels <- lapply(sents, function(x) paste(x,format(round((length((tweet_data[tweet_data$sentiment ==x,])$text)/length(tweet_data$sentiment)*100),2),nsmall=2),"%"))
+
+nemo = length(sents)
+emo.docs = rep("", nemo) 
+
+for (i in 1:nemo)
+{
+  tmp = tweet_data[tweet_data$sentiment == sents[i],]$text
+  
+  emo.docs[i] = paste(tmp,collapse=" ")
+}  
+
+emo.docs = removeWords(emo.docs, stopwords("german"))
+
+emo.docs = removeWords(emo.docs, stopwords("english"))
+corpus = Corpus(VectorSource(emo.docs)) 
+tdm = TermDocumentMatrix(corpus)
+tdm = as.matrix(tdm)
+colnames(tdm) = labels
+#to create a png file (warning in R studio plotting)
+png("wordcloud_packages.png", width=12,height=8, units='in', res=300)
+# comparison word cloud
+comparison.cloud(tdm, colors = brewer.pal(nemo, "Dark2"),
+                 scale = c(3,.5), random.order = FALSE, title.size = 1.5)
+dev.off() #give rights to access to png file
